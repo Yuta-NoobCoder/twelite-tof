@@ -176,20 +176,24 @@ with open(log_file_path, 'w') as log_file:
                 # ビーコン1 計測
                 timestamp_beacon1_start = getTimeMs()                
                 ser_1.write(b'm')
-                value_beacon_1 = 0
-                raw_beacon_1 = ser_1.readline()
-                if raw_beacon_1.strip() != b'':
-                    value_beacon_1 = int(raw_beacon_1.strip())
+                value_beacon_1_tof = 0
+                value_beacon_1_rssi = 0
+                raw_beacon_1 = ser_1.readline().strip()
+                if raw_beacon_1 != b'':
+                    value_beacon_1_tof = int(raw_beacon_1.split(",")[0])
+                    value_beacon_1_rssi = int(raw_beacon_1.split(",")[1])
                 ser_1.flush()
                 timestamp_beacon1_end = getTimeMs()
                 
                 #ビーコン2 計測
                 timestamp_beacon2_start = getTimeMs()
                 ser_2.write(b'm')
-                value_beacon_2 = 0
-                raw_beacon_2 = ser_2.readline()
-                if raw_beacon_2.strip() != b'':
-                    value_beacon_2 = int(raw_beacon_2.strip())                    
+                value_beacon_2_tof = 0
+                value_beacon_2_rssi = 0
+                raw_beacon_2 = ser_2.readline().strip()
+                if raw_beacon_2 != b'':
+                    value_beacon_2_tof = int(raw_beacon_2.split(",")[0])
+                    value_beacon_2_rssi = int(raw_beacon_2.split(",")[1])       
                 ser_2.flush()
                 timestamp_beacon2_end = getTimeMs()
                 
