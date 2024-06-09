@@ -14,7 +14,7 @@ import keyboard
 # python .\log_plot_dual_beacon.py --p1 COM3 --p2 COM4 --dir rouka_test_sync --n 200
 
 # パーティクルフィルタの初期化
-n_particle = 1000
+n_particle = 500
 particles = [Particle((5 + 4.8, 6.6)) for p in range(n_particle)]
 beacons = [Beacon(position= (-5, 0)), Beacon(position=(5, 0))]
 pfilter = ParticleFilter(particles)
@@ -79,7 +79,7 @@ log_file_path = args.dir + "/data.log"	 # ログファイル名
 
 cnt = 0
 elapsed_time_ms = 0
-timespan_ms = 200
+timespan_ms = 250
 
 half_timespan_ms = timespan_ms / 2
 
@@ -125,7 +125,7 @@ with open(args.dir + "/offset.log", 'w') as offset_file:
             value_beacon_1 = 0
             raw_beacon_1 = ser_1.readline()
             if raw_beacon_1.strip() != b'':
-                value_beacon_1 = int(raw_beacon_1.strip())
+                value_beacon_1 = int(raw_beacon_1.strip().decode(encoding='utf-8').split(",")[0])
                 values_beacon_1.append(value_beacon_1)
             ser_1.flush()
             # beacon 2
@@ -133,7 +133,7 @@ with open(args.dir + "/offset.log", 'w') as offset_file:
             value_beacon_2 = 0
             raw_beacon_2 = ser_2.readline()
             if raw_beacon_2.strip() != b'':
-                value_beacon_2 = int(raw_beacon_2.strip())     
+                value_beacon_2 = int(raw_beacon_2.strip().decode(encoding='utf-8').split(",")[0])     
                 values_beacon_2.append(value_beacon_2)
             ser_2.flush()
             
@@ -179,9 +179,10 @@ with open(log_file_path, 'w') as log_file:
                 value_beacon_1_tof = 0
                 value_beacon_1_rssi = 0
                 raw_beacon_1 = ser_1.readline().strip()
-                if raw_beacon_1 != b'':
-                    value_beacon_1_tof = int(raw_beacon_1.split(",")[0])
-                    value_beacon_1_rssi = int(raw_beacon_1.split(",")[1])
+                if raw_beacon_1 != b'' and raw_beacon_1 != b'-1':
+                    # print(raw_beacon_1)
+                    value_beacon_1_tof = int(raw_beacon_1.decode(encoding='utf-8').split(",")[0])
+                    value_beacon_1_rssi = int(raw_beacon_1.decode(encoding='utf-8').split(",")[1])
                 ser_1.flush()
                 timestamp_beacon1_end = getTimeMs()
                 
@@ -191,9 +192,10 @@ with open(log_file_path, 'w') as log_file:
                 value_beacon_2_tof = 0
                 value_beacon_2_rssi = 0
                 raw_beacon_2 = ser_2.readline().strip()
-                if raw_beacon_2 != b'':
-                    value_beacon_2_tof = int(raw_beacon_2.split(",")[0])
-                    value_beacon_2_rssi = int(raw_beacon_2.split(",")[1])       
+                if raw_beacon_2 != b'' and raw_beacon_2 != b'-1':
+                    # print(raw_beacon_2)
+                    value_beacon_2_tof = int(raw_beacon_2.decode(encoding='utf-8').split(",")[0])
+                    value_beacon_2_rssi = int(raw_beacon_2.decode(encoding='utf-8').split(",")[1])       
                 ser_2.flush()
                 timestamp_beacon2_end = getTimeMs()
                 
@@ -208,7 +210,7 @@ with open(log_file_path, 'w') as log_file:
                 time.sleep(diff / 1000)
                 timestamp_end = getTimeMs()
             
-            output = "{},{},{},{},{}".format(cnt, timestamp_beacon1_start, elapsed_time_ms, value_beacon_1, value_beacon_2)
+            output = "{},{},{},{},{},{},{}".format(cnt, timestamp_beacon1_start, elapsed_time_ms, value_beacon_1_tof, value_beacon_2_tof, value_beacon_1_rssi, value_beacon_2_rssi)
             log_file.write(output + "\n")
             print(output)
 
@@ -217,8 +219,8 @@ with open(log_file_path, 'w') as log_file:
             scatter_particles.set_offsets([[p.position[0], p.position[1]] for p in pfilter.particles])
         
             # 観測
-            d1 = get_dist_tof(value_beacon_1)
-            d2 = get_dist_tof(value_beacon_2)
+            d1 = get_dist_tof(value_beacon_1_tof)
+            d2 = get_dist_tof(value_beacon_2_tof)
         
             if cnt > 0:
             
@@ -229,8 +231,8 @@ with open(log_file_path, 'w') as log_file:
                 # LPF 
                 # y[n] = (1-a) * x[n] + a * y[n-1]
                 const = 0.9
-                tof1_filtered = (1 - const) * value_beacon_1 + (const * old_tof1)
-                tof2_filtered = (1 - const) * value_beacon_2 + (const * old_tof2)
+                tof1_filtered = (1 - const) * value_beacon_1_tof + (const * old_tof1)
+                tof2_filtered = (1 - const) * value_beacon_2_tof + (const * old_tof2)
 
                 # 三点測量による予測点のプロット
                 # 生データ
@@ -246,14 +248,14 @@ with open(log_file_path, 'w') as log_file:
                 
                 # 観測
                 # 両ビーコンのデータがなければスキップ
-                if value_beacon_1 > 0 and value_beacon_2 > 0:
+                if value_beacon_1_tof > 0 and value_beacon_2_tof > 0:
                     pfilter.observation_dual(tof1_filtered, tof2_filtered, beacons[0], beacons[1])
                     old_tof1 = tof1_filtered
                     old_tof2 = tof2_filtered
             else:
                 new_time = timestamp_beacon1_start
-                old_tof1 = value_beacon_1
-                old_tof2 = value_beacon_2
+                old_tof1 = value_beacon_1_tof
+                old_tof2 = value_beacon_2_tof
     
             old_time = new_time
             cnt+=1
