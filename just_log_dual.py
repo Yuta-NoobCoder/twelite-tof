@@ -48,12 +48,14 @@ with open(log_file_path, 'w') as log_file:
                 timestamp_beacon1_start = getTimeMs()                
                 ser_1.write(b'm')
                 value_beacon_1_tof = 0
-                value_beacon_1_rssi = 0
+                value_beacon_1_rssi_local = 0
+                value_beacon_1_rssi_remote = 0
                 raw_beacon_1 = ser_1.readline().strip()
                 if raw_beacon_1 != b'' and raw_beacon_1 != b'-1':
                     # print(raw_beacon_1)
                     value_beacon_1_tof = int(raw_beacon_1.decode(encoding='utf-8').split(",")[0])
-                    value_beacon_1_rssi = int(raw_beacon_1.decode(encoding='utf-8').split(",")[1])
+                    value_beacon_1_rssi_local = int(raw_beacon_1.decode(encoding='utf-8').split(",")[1])
+                    value_beacon_1_rssi_remote = int(raw_beacon_1.decode(encoding='utf-8').split(",")[1])
                 ser_1.flush()
                 timestamp_beacon1_end = getTimeMs()
                 
@@ -61,12 +63,14 @@ with open(log_file_path, 'w') as log_file:
                 timestamp_beacon2_start = getTimeMs()
                 ser_2.write(b'm')
                 value_beacon_2_tof = 0
-                value_beacon_2_rssi = 0
+                value_beacon_2_rssi_local = 0
+                value_beacon_2_rssi_remote = 0
                 raw_beacon_2 = ser_2.readline().strip()
                 if raw_beacon_2 != b'' and raw_beacon_2 != b'-1':
                     # print(raw_beacon_2)
                     value_beacon_2_tof = int(raw_beacon_2.decode(encoding='utf-8').split(",")[0])
-                    value_beacon_2_rssi = int(raw_beacon_2.decode(encoding='utf-8').split(",")[1])       
+                    value_beacon_2_rssi_local = int(raw_beacon_2.decode(encoding='utf-8').split(",")[1])
+                    value_beacon_2_rssi_remote = int(raw_beacon_1.decode(encoding='utf-8').split(",")[1])     
                 ser_2.flush()
                 timestamp_beacon2_end = getTimeMs()
                 
@@ -81,7 +85,7 @@ with open(log_file_path, 'w') as log_file:
                 time.sleep(diff / 1000)
                 timestamp_end = getTimeMs()
             
-            output = "{},{},{},{},{},{},{}".format(cnt, timestamp_beacon1_start, elapsed_time_ms, value_beacon_1_tof, value_beacon_2_tof, value_beacon_1_rssi, value_beacon_2_rssi)
+            output = "{},{},{},{},{},{},{},{},{}".format(cnt, timestamp_beacon1_start, elapsed_time_ms, value_beacon_1_tof, value_beacon_2_tof, value_beacon_1_rssi_local, value_beacon_2_rssi_local, value_beacon_1_rssi_remote, value_beacon_2_rssi_remote)
             log_file.write(output + "\n")
             print(output)
 
