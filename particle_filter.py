@@ -1,6 +1,7 @@
 
 import copy
 from math import cos, exp, floor, pi, sin, sqrt
+import math
 import random
 import numpy as np
 
@@ -17,6 +18,10 @@ class Beacon:
     def get_estimated_tof(self, particle: Particle):
         distance = np.linalg.norm(np.array(particle.position) - np.array(self.position))
         return floor(distance * 10 ** 12 / 299792458)
+    
+    def get_estimated_rssi(self,  particle: Particle):
+        distance = np.linalg.norm(np.array(particle.position) - np.array(self.position))
+        return 108 - 20 * math.log10(distance / 0.02)
 
 class ParticleFilter:
     def __init__(self, particles):
@@ -79,12 +84,12 @@ class ParticleFilter:
             # 4方向に絞る
             directions = [0, pi / 2, pi, 3 * pi / 2]  # 0度、90度、180度、270度
             # directions = [0, pi / 4, pi / 2, 3 * pi / 4, pi, 5 * pi / 4, 3 * pi / 2, 7 * pi / 4]
-            rounded_angle = min(directions, key=lambda x: abs(x - random_angle))
+            rounded_angle = min(directions, key=lambda x: abs(x - self.random_vectors[idx]))
             
-            particle.position = (particle.position[0] + random_speed * cos(self.random_vectors[index]) * duration ,
-                                 particle.position[1] + random_speed * sin(self.random_vectors[index]) * duration ) 
-            # particle.position = (particle.position[0] + speed_abs * cos(self.random_vectors[idx]) * duration ,
-            #                      particle.position[1] + speed_abs * sin(self.random_vectors[idx]) * duration ) 
+            # particle.position = (particle.position[0] + random_speed * cos(self.random_vectors[index]) * duration ,
+            #                      particle.position[1] + random_speed * sin(self.random_vectors[index]) * duration ) 
+            particle.position = (particle.position[0] + speed_abs * cos(rounded_angle) * duration ,
+                                 particle.position[1] + speed_abs * sin(rounded_angle) * duration ) 
             idx += 1
         
     # 観測
@@ -108,10 +113,12 @@ class ParticleFilter:
         normalized_weights = weights / weight_sum
         for idx, particle in enumerate(self.particles):
             particle.weight = normalized_weights[idx]
+            
+    def calc_likelyhood_gaussian(self, sigma, observed, ideal):
+        return (1 / sqrt(2 * pi * (sigma ** 2))) * exp( -((ideal - observed) ** 2) / (2 * (sigma ** 2)))
         
-    def observation_dual(self, tof1, tof2, beacon1, beacon2):
+    def observation_dual(self, tof1, tof2, beacon1: Beacon, beacon2: Beacon):
         sigma = 3000
-        
         for particle in self.particles:
             # ビーコンとパーティクルの座標から, 予測ToFを求める
             ideal_tof_1 = beacon1.get_estimated_tof(particle)
@@ -119,11 +126,43 @@ class ParticleFilter:
             if abs(ideal_tof_1 - tof1)  > sigma:
                 # 捨てる
                 pass
-            
             # 予測ToFを中心としたガウス分布から, 実際のToFがどれだけ離れているかを求める
-            likelihood_1 = (1 / sqrt(2 * pi * (sigma ** 2))) * exp( -((ideal_tof_1 - tof1) ** 2) / (2 * (sigma ** 2)))
-            likelihood_2 = (1 / sqrt(2 * pi * (sigma ** 2))) * exp( -((ideal_tof_2 - tof2) ** 2) / (2 * (sigma ** 2)))
+            likelihood_1 = self.calc_likelyhood_gaussian(sigma, tof1, ideal_tof_1)
+            likelihood_2 = self.calc_likelyhood_gaussian(sigma, tof2, ideal_tof_2)
             particle.weight = likelihood_1 * likelihood_2 
+        #正規化
+        self.normalize()
+        # リサンプリング
+        ess = self._calc_ess()
+        if ess < len(self.particles) / 2:
+            self._resample()
+            self.random_vectors = [random.uniform(0, 2 * pi) for _ in self.particles]
+            
+    def observation_dual_tof_rssi(self, tof1, tof2, rssi1, rssi2, beacon1: Beacon, beacon2: Beacon):
+        
+        sigma_tof = 3000
+        sigma_rssi = 1
+        
+        for particle in self.particles:
+            # ビーコンとパーティクルの座標から, 予測ToFを求める
+            ideal_tof_1 = beacon1.get_estimated_tof(particle)
+            ideal_tof_2 = beacon2.get_estimated_tof(particle)
+            ideal_rssi_1 = beacon1.get_estimated_rssi(particle)
+            ideal_rssi_2 = beacon2.get_estimated_rssi(particle)
+            
+            if abs(ideal_tof_1 - tof1)  > sigma_tof:
+                # 捨てる
+                pass
+            
+            # 値が小さくなりすぎるので定数倍する
+            factor = 10 ** 5
+            # 予測ToFを中心としたガウス分布から, 実際のToFがどれだけ離れているかを求める
+            likelihood_1_tof =  self.calc_likelyhood_gaussian(sigma_tof, tof1, ideal_tof_1) * factor
+            likelihood_2_tof =  self.calc_likelyhood_gaussian(sigma_tof, tof2, ideal_tof_2) * factor 
+            likelihood_1_rssi = self.calc_likelyhood_gaussian(sigma_rssi, rssi1, ideal_rssi_1) * factor
+            likelihood_2_rssi = self.calc_likelyhood_gaussian(sigma_rssi, rssi2, ideal_rssi_2) * factor
+            particle.weight = likelihood_1_tof * likelihood_2_tof
+            # particle.weight = likelihood_1_tof * likelihood_2_tof * likelihood_1_rssi * likelihood_2_rssi
         
         #正規化
         self.normalize()
